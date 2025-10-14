@@ -2,28 +2,34 @@
   import { ref, onMounted } from 'vue';
   import api from '@/plugins/axios';
   import Loading from 'vue-loading-overlay';
+  import { useGenreStore } from '@/stores/genre';
+
+  const genreStore = useGenreStore();
 
   const isLoading = ref(false);
 
   const genres = ref([]);
   const movies = ref([]);
+  const formatDate = (date) => new Date(date).toLocaleDateString('pt-BR');
 
   const getGenreName = (id) => genres.value.find((genre) => genre.id === id).name
 
   onMounted(async () => {
-    const response = await api.get('genre/movie/list?language=pt-BR');
-    genres.value = response.data.genres;
-  });
+  isLoading.value = true;
+  await genreStore.getAllGenres('movie');
+  isLoading.value = false;
+});
 
- const listMovies = async (genreId) => {
+const listMovies = async (genreId) => {
+  genreStore.setCurrentGenreId(genreId);
   isLoading.value = true;
   const response = await api.get('discover/movie', {
     params: {
       with_genres: genreId,
-      language: 'pt-BR'
-    }
+      language: 'pt-BR',
+    },
   });
-  movies.value = response.data.results
+  movies.value = response.data.results;
   isLoading.value = false;
 };
 
@@ -33,10 +39,11 @@
 
   <ul class="genre-list">
      <li
-    v-for="genre in genres"
+    v-for="genre in genreStore.genres"
     :key="genre.id"
-    @click="listMovies(genre.id)"
+    @click="listMovies(genre.id)
     class="genre-item"
+    :class="{ active: genre.id === genreStore.currentGenreId }"
   >
     {{ genre.name }}
   </li>
@@ -52,21 +59,22 @@
     />
     <div class="movie-details">
       <p class="movie-title">{{ movie.title }}</p>
-      <p class="movie-release-date">{{ movie.release_date }}</p>
-      <p class="movie-genres">{{ movie.genre_ids }}</p>
+      <p class="movie-release-date">{{ formatDate(movie.release_date) }}</p>
+      <p class="movie-genres">
+      <span
+  v-for="genre_id in movie.genre_ids"
+  :key="genre_id"
+  @click="listMovies(genre_id)"
+  :class="{ active: genre_id === genreStore.currentGenreId }"
+>
+  {{ genreStore.getGenreName(genre_id) }}
+</span>
+</p>
     </div>
   </div>
 </div>
 
-<p class="movie-genres">
-  <span
-    v-for="genre_id in movies.genre_ids"
-    :key="genre_id"
-    @click="listMovies(genre_id)"
-  >
-    {{ getGenreName(genre_id) }}
-  </span>
-</p>
+
 
 </template>
 <style scoped>
@@ -144,5 +152,15 @@
   cursor: pointer;
   background-color: #455a08;
   box-shadow: 0 0 0.5rem #748708;
+}
+.active {
+  background-color: #67b086;
+  font-weight: bolder;
+}
+
+.movie-genres span.active {
+  background-color: #abc322;
+  color: #000;
+  font-weight: bolder;
 }
 </style>
