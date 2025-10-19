@@ -2,27 +2,42 @@
   import { ref, onMounted } from 'vue';
   import api from '@/plugins/axios';
   import Loading from 'vue-loading-overlay';
+  import { useGenreStore } from '@/stores/genre';
+  import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+
+function openPrograma(programaId) {
+  router.push({ name: 'ProgramaDetails', params: { programaId } });
+}
+
+  const genreStore = useGenreStore();
 
   const isLoading = ref(false);
 
-  const genres = ref([]);
+  //const genres = ref([]);
   const programas = ref([]);
+   //const getGenreName = (id) => genres.value.find((genre) => genre.id === id)?.name ?? ''
 
-  onMounted(async () => {
-    const response = await api.get('genre/tv/list?language=pt-BR');
-    genres.value = response.data.genres;
+   const formatDate = (date) => new Date(date).toLocaleDateString('pt-BR');
+
+    onMounted(async () => {
+    isLoading.value = true;
+    await genreStore.getAllGenres('tv');             
+    isLoading.value = false;
   });
 
-   const listProgramas = async (genreId) => {
-      isLoading.value = true;
-  const response = await api.get('discover/movie', {
+  const listProgramas = async (genreId) => {
+  genreStore.setCurrentGenreId(genreId);
+  isLoading.value = true;
+  const response = await api.get('discover/tv', {
     params: {
       with_genres: genreId,
-      language: 'pt-BR'
-    }
+      language: 'pt-BR',
+    },
   });
-  const getGenreName = (id) => genres.value.find((genre) => genre.id === id).name
-  programas.value = response.data.results
+  programas.value = response.data.results;
   isLoading.value = false;
 };
 
@@ -32,14 +47,16 @@
 
   <h1>Programas de TV</h1>
    <ul class="genre-list">
-     <li
-    v-for="genre in genres"
+       <li
+    v-for="genre in genreStore.genres"
     :key="genre.id"
     @click="listProgramas(genre.id)"
-    class="genre-item"
+    class="genre-item" :class="{ active: genre.id === genreStore.currentGenreId }"
+
   >
     {{ genre.name }}
   </li>
+
   </ul>
   <loading v-model:active="isLoading" is-full-page />
 
@@ -47,21 +64,23 @@
 
     <div v-for ="programa in programas" :key ="programa.id" class="programa-card">
         <img
-      :src="`https://image.tmdb.org/t/p/w500${programa.poster_path}`"
-      :alt="programa.title"
-      />
+  :src="`https://image.tmdb.org/t/p/w500${programa.poster_path}`"
+  :alt="programa.name"
+  @click="openPrograma(programa.id)"
+/>
 
       <div class="programa-details">
         <p class="programa-name">{{ programa.name }}</p>
-        <p class="programa-date">{{ programa.first_air_date}}</p>
+       <p class="programa-release-date">{{ formatDate(programa.first_air_date) }}</p>
         <p class="programa-genres">
   <span
-    v-for="genre_id in programa.genre_ids"
-    :key="genre_id"
-    @click="listMovies(genre_id)"
-  >
-    {{ getGenreName(genre_id) }}
-  </span>
+  v-for="genre_id in programa.genre_ids"
+  :key="genre_id"
+  @click="listProgramas(genre_id)"
+  :class="{ active: genre_id === genreStore.currentGenreId }"
+>
+  {{ genreStore.getGenreName(genre_id) }}
+</span>
 </p>
       </div>
 
@@ -146,5 +165,16 @@
   cursor: pointer;
   background-color: #455a08;
   box-shadow: 0 0 0.5rem #748708;
+}
+
+.active {
+  background-color: #67b086;
+  font-weight: bolder;
+}
+
+.programa-genres span.active {
+  background-color: #abc322;
+  color: #000;
+  font-weight: bolder;
 }
 </style>
